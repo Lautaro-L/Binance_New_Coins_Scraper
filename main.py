@@ -2,11 +2,11 @@ import os
 import re
 import time
 import json
-from typing import NewType
 import requests
+import threading
 from datetime import date
+from typing import NewType
 from datetime import datetime
-from threading import Thread
 import dateutil.parser as dparser
 
 ARTICLES_URL = 'https://www.binance.com/bapi/composite/v1/public/cms/article/catalog/list/query?catalogId=48&pageNo=1&pageSize=15'
@@ -16,6 +16,8 @@ key_words = ['Futures', 'Isolated', 'Margin', 'Launchpool', 'Launchpad', 'Cross'
 filter_List = ['body', 'type', 'catalogId', 'catalogName', 'publishDate']
 
 file = 'announcements.json'
+schedules_file = 'scheduled_order.json'
+
 
 def get_Announcements():
     unfiltered_Articles = requests.get(ARTICLES_URL).json()['data']['articles']
@@ -41,12 +43,9 @@ def get_Announcements():
 def get_Pair_and_DateTime(ARTICLE_CODE):
     new_Coin = requests.get(ARTICLE+ARTICLE_CODE).json()['data']['seoDesc']
     datetime = dparser.parse(new_Coin, fuzzy=True, ignoretz=True)
-    pair = re.findall('\S{2,6}?/USDT', new_Coin)
-    print(datetime)
-    print(pair)
+    pair = re.findall(r'\S{2,6}?/USDT', new_Coin)
+    return [datetime, pair]
     
-
-
 
 def save_json(file, order):
     with open(file, 'w') as f:
@@ -58,7 +57,15 @@ def load_json(file):
 
 
 
+def update_announcements(announcement, existing_Anouncements):
+    existing_Anouncements.append(announcement)
+    save_json(file, existing_Anouncements)
 
+
+def schedule_Order(time_And_Pair, announcement, existing_Anouncements):
+    scheduled_order = {'time':time_And_Pair[0].strftime("%Y-%m-%d %H:%M:%S"), 'pairs':time_And_Pair[1]}
+    save_json(schedules_file, scheduled_order)
+    update_announcements(announcement, existing_Anouncements)
 
 
 def main():
@@ -76,13 +83,15 @@ def main():
 
     for announcement in new_Anouncements:
         if not announcement in existing_Anouncements:
-            get_Pair_and_DateTime(announcement['code'])
+            time_And_Pair = get_Pair_and_DateTime(announcement['code'])
+            schedule_Order(time_And_Pair, announcement, existing_Anouncements)
+
+
 
 #TODO:
-# after the purchase is done save in on database
+# after the purchase is done remove it from scheduled
 # posible integration with AWS lambda ping it time before the coin is listed so it can place a limit order a little bti more than opening price
 # add config files
-# extract keywords from seoDesc
 # plan multiple purchases?
 
 
