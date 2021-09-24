@@ -4,6 +4,10 @@ import time
 import json
 import requests
 import threading
+
+
+from json_manage import *
+from binance_key import *
 from datetime import datetime
 import dateutil.parser as dparser
 
@@ -15,6 +19,22 @@ filter_List = ['body', 'type', 'catalogId', 'catalogName', 'publishDate']
 
 file = 'announcements.json'
 schedules_file = 'scheduled_order.json'
+executed_trades_file = 'executed_trades.json'
+
+ammount = 500
+
+client = load_binance_creds(r'auth.yml')
+
+
+def create_order(pair, usdt_to_spend, action):
+    return client.create_order(
+        symbol = pair,
+        side = action,
+        type = 'MARKET',
+        quoteOrderQty = usdt_to_spend,
+        recvWindow = "10000"
+    )
+
 
 
 def get_Announcements():
@@ -39,46 +59,44 @@ def get_Announcements():
 
 
 def get_Pair_and_DateTime(ARTICLE_CODE):
+    
     new_Coin = requests.get(ARTICLE+ARTICLE_CODE).json()['data']['seoDesc']
     datetime = dparser.parse(new_Coin, fuzzy=True, ignoretz=True)
-    pair = re.findall(r'\S{2,6}?/USDT', new_Coin)
-    return [datetime, pair]
+    
+    raw_pairs = re.findall(r'\S{2,6}?/USDT', new_Coin)
+    pairs = []
+    
+    for pair in raw_pairs:
+        pairs.append(pair.replace('/', ''))
+    return [datetime, pairs]
     
 
-def save_json(file, order):
-    with open(file, 'w') as f:
-        json.dump(order, f, indent=4)
-
-def load_json(file):
-    with open(file, "r+") as f:
-        return json.load(f)
+def executed_order(order):
+    update_json(executed_trades_file, order)#needs more logic 
 
 
-
-def update_announcements(announcement, existing_Anouncements):
-    existing_Anouncements.append(announcement)
-    save_json(file, existing_Anouncements)
-
-
-def schedule_Order(time_And_Pair, announcement, existing_Anouncements):
+def schedule_Order(time_And_Pair, announcement):
     scheduled_order = {'time':time_And_Pair[0].strftime("%Y-%m-%d %H:%M:%S"), 'pairs':time_And_Pair[1]}
-    
-    if os.path.exists(schedules_file):
-        existing_schedules = load_json(schedules_file)
-        existing_schedules.append(scheduled_order)
-    else: existing_schedules = [scheduled_order]
-    
-    save_json(schedules_file, existing_schedules)
-    update_announcements(announcement, existing_Anouncements)
+
+    update_json(schedules_file, scheduled_order)
+    update_json(file, announcement)
 
 
-def place_Order_On_Time(time_till_live, pair, time_to_wait):
+
+def place_Order_On_Time(time_till_live, pair):
+    
+    time_to_wait = ((time_till_live - datetime.utcnow()).total_seconds() - 10)
+    time_till_live = str(time_till_live)
     time.sleep(time_to_wait)
+
     while True:
-        if time_till_live == datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
-            print(datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f"))
-            print('check')
+        if time_till_live == datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"):
+            print(pair, ammount, 'BUY')
+            #executed_order(order)
             break
+
+
+
 
 def check_Schedules():
     
@@ -86,15 +104,15 @@ def check_Schedules():
         schedules = load_json(schedules_file)
         
         for schedule in schedules:
-            
+            datetime = dparser.parse(schedule['time'], fuzzy=True, ignoretz=True)
+            if datetime > datetime.utcnow():
+                del schedule
+
+
             for pair in schedule['pairs']:
                 
-                datetime = dparser.parse(schedule['time'], fuzzy=True, ignoretz=True)
                 
-                time_to_wait = ((datetime - datetime.now()).total_seconds() - 9)
-                
-                threading.Thread(target=place_Order_On_Time, args=(str(datetime), pair, time_to_wait)).start()
-            
+                threading.Thread(target=place_Order_On_Time, args=(datetime, pair)).start()
 
 
 def main():
@@ -113,16 +131,16 @@ def main():
     for announcement in new_Anouncements:
         if not announcement in existing_Anouncements:
             time_And_Pair = get_Pair_and_DateTime(announcement['code'])
-            schedule_Order(time_And_Pair, announcement, existing_Anouncements)
+            schedule_Order(time_And_Pair, announcement)
             for pair in time_And_Pair[1]:
-                time_to_wait = ((time_And_Pair[0] - datetime.now()).total_seconds() - 9)
-                threading.Thread(target=place_Order_On_Time, args=(time_And_Pair[0], pair, time_to_wait)).start()
+                threading.Thread(target=place_Order_On_Time, args=(time_And_Pair[0], pair)).start()
 
 
 #TODO:
 # after the purchase is done remove it from scheduled
 # posible integration with AWS lambda ping it time before the coin is listed so it can place a limit order a little bti more than opening price
 # add config files
+# once the code its better add support to other exchanges
 
 
 if __name__ == '__main__':

@@ -6,3 +6,4 @@ __pycache__/
 #files
 announcements.json
 scheduled_order.json
+auth.yml
