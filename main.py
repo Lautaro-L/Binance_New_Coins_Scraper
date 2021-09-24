@@ -21,6 +21,7 @@ filter_List = ['body', 'type', 'catalogId', 'catalogName', 'publishDate']
 file = 'announcements.json'
 schedules_file = 'scheduled_order.json'
 executed_trades_file = 'executed_trades.json'
+executed_sells_file = 'executed_sells_trades.json'
 
 
 
@@ -136,7 +137,8 @@ def place_Order_On_Time(time_till_live, pair):
             if time_till_live == datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"):
                 #order = create_order(pair, ammount, 'BUY')
                 break
-    
+    order['tp'] = tp
+    order['sl'] = sl
     executed_order(order)
 
 ######
@@ -165,7 +167,85 @@ def check_Schedules():
         save_json(schedules_file, schedules)
 
                 
-                
+
+def sell():
+
+    while True:
+        if os.path.exists(executed_trades_file):
+            order = load_json(executed_trades_file)
+
+            for coin in list(order):
+
+                # store some necesarry trade info for a sell
+                stored_price = float(coin['price'])
+                coin_tp = coin['tp']
+                coin_sl = coin['sl']
+                volume = coin['executedQty']
+                symbol = coin['symbol']
+                not_sold_orders = []
+
+                last_price = get_price(symbol)
+
+                # update stop loss and take profit values if threshold is reached
+                if float(last_price) > stored_price + (stored_price * float(coin_tp) /100) and tsl_mode:
+                    # increase as absolute value for TP
+                    new_tp = float(last_price) + (float(last_price)*ttp /100)
+                    # convert back into % difference from when the coin was bought
+                    new_tp = float( (new_tp - stored_price) / stored_price*100)
+
+                    # same deal as above, only applied to trailing SL
+                    new_sl = float(last_price) - (float(last_price)*tsl /100)
+                    new_sl = float((new_sl - stored_price) / stored_price*100)
+
+                    # new values to be added to the json file
+                    coin['tp'] = new_tp
+                    coin['sl'] = new_sl
+                    not_sold_orders.append(coin)
+                    save_json(executed_trades_file, not_sold_orders)
+
+                    print(f'updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)}')
+                    #sendmsg(f'updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)}')
+                # close trade if tsl is reached or trail option is not enabled
+                elif float(last_price) < stored_price - (stored_price*sl /100) or float(last_price) > stored_price + (stored_price*tp /100) and not tsl_mode:
+
+                    try:
+
+                        # sell for real if test mode is set to false
+                        if not test_mode:
+                            sell = client.create_order(symbol = symbol, side = 'SELL', type = 'MARKET', quantity = volume, recvWindow = "10000")
+
+
+                        print(f"sold {symbol} at {(float(last_price) - stored_price) / float(stored_price)*100}")
+                        #sendmsg(f"sold {coin} at {(float(last_price) - stored_price) / float(stored_price)*100}")
+                        # remove order from json file by not adding it
+
+                    except Exception as e:
+                        print(e)
+
+                    # store sold trades data
+                    else:
+                        if os.path.exists(executed_sells_file):
+                            sold_coins = load_json(executed_sells_file)
+
+                        else:
+                            sold_coins = []
+
+                        if not test_mode:
+                            sold_coins.append(sell)
+                            save_json(executed_sells_file, sold_coins)
+                        else:
+                            sell = {
+                                        'symbol':symbol,
+                                        'price':last_price,
+                                        'volume':volume,
+                                        'time':datetime.timestamp(datetime.now()),
+                                        'profit': float(last_price) - stored_price,
+                                        'relative_profit': round((float(last_price) - stored_price) / stored_price*100, 3)
+                                        }
+
+                            save_json(executed_sells_file, sold_coins)
+        time.sleep(1)          
+
 
 
 def main():
@@ -183,6 +263,7 @@ def main():
         save_json(file, existing_Anouncements)
     
     threading.Thread(target=check_Schedules, args=()).start()
+    threading.Thread(target=sell, args=()).start()
     
     
     while True:
