@@ -1,0 +1,12 @@
+---
+  TRADE_OPTIONS:
+    QUANTITY: 50
+    PAIRING: USDT
+    # How often to check for posts in seconds
+    RUN_EVERY: 600
+    TEST: True
+    SL: 3
+    TP: 5
+    ENABLE_TSL: True
+    TSL: 0.4
+    TTP: 3

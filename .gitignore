@@ -6,4 +6,5 @@ __pycache__/
 #files
 announcements.json
 scheduled_order.json
+executed_trades.json
 auth.yml
