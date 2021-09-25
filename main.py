@@ -66,6 +66,8 @@ regex = '\S{2,6}?/'+ pairing
 def sendmsg(message):
     if telegram_status:
         threading.Thread(target=chat.send_message, args=(message,)).start()
+    else:
+        print(message)
 
 
 def ping_binance():
@@ -252,7 +254,6 @@ def sell():
                         not_sold_orders.append(coin)
                         save_json(executed_trades_file, not_sold_orders)
 
-                        print(f'updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)}')
                         sendmsg(f'updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)} for: {symbol}')
                     # close trade if tsl is reached or trail option is not enabled
                     elif float(last_price) < stored_price - (stored_price*sl /100) or float(last_price) > stored_price + (stored_price*tp /100) and not tsl_mode:
@@ -264,7 +265,6 @@ def sell():
                                 sell = client.create_order(symbol = symbol, side = 'SELL', type = 'MARKET', quantity = volume, recvWindow = "10000")
 
 
-                            print(f"sold {symbol} at {(float(last_price) - stored_price) / float(stored_price)*100}")
                             sendmsg(f"sold {symbol} at {(float(last_price) - stored_price) / float(stored_price)*100}")
                             # remove order from json file by not adding it
 
@@ -339,8 +339,7 @@ def main():
 if __name__ == '__main__':
     try:
         sendmsg(f'starting')
-        print('Starting')
-        print(ping_binance())
+        sendmsg('Aproximate delay: {ping_binance()}')
         main()
     except Exception as exception:
         wrong = traceback.format_exc(limit=None, chain=True)
