@@ -10,8 +10,8 @@
     ENABLE_TSL: True
     TSL: 0.5
     TTP: 2
-    CONSIDER_DELAY: False
-    PERCENTAGE: 0.15
+    CONSIDER_DELAY: True
+    PERCENTAGE: 0.2
     #take in consideration the delay to place the order
     #since the ping includes also the time it takes binance to process the order we take a little percent of that time
     #if running close to tokyo better  leave it false,

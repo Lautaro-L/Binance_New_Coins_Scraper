@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import json
 import requests
 import threading
 import traceback
@@ -24,7 +25,7 @@ schedules_file = 'scheduled_order.json'
 executed_trades_file = 'executed_trades.json'
 executed_sells_file = 'executed_sells_trades.json'
 
-
+executed_queque = []
 
 cnf = load_config('config.yml')
 client = load_binance_creds(r'auth.yml')
@@ -134,8 +135,19 @@ def create_order(pair, usdt_to_spend, action):
         sendmsg(wrong)
     return order
 
-def executed_order(order):
-    update_json(executed_trades_file, order)#needs more logic maybe to remove finished schedules tho is not critical
+def executed_orders():
+    global executed_queque
+    while True:
+        if len(executed_queque) > 0:
+            if os.path.exists(executed_trades_file):
+                existing_file = load_json(executed_trades_file)
+                existing_file += executed_queque
+            else: 
+                existing_file = executed_queque
+            save_json(executed_trades_file, existing_file)
+            executed_queque = []
+        time.sleep(0.1)
+            
 
 
 def schedule_Order(time_And_Pair, announcement):
@@ -150,8 +162,9 @@ def schedule_Order(time_And_Pair, announcement):
         sendmsg(wrong)
 
 
-def place_Order_On_Time(time_till_live, pair):
+def place_Order_On_Time(time_till_live, pair, threads):
     delay = 0
+    global executed_queque
     try:
         if delay_mode:
             delay = (ping_binance() * percentage)
@@ -184,10 +197,10 @@ def place_Order_On_Time(time_till_live, pair):
                     break
         order['tp'] = tp
         order['sl'] = sl
-        executed_order(order)
         amount = order['executedQty']
         price =order['price']
         sendmsg(f'bougth {amount} of {pair} at {price}')
+        executed_queque.append(order)
     except Exception as exception:       
         wrong = traceback.format_exc(limit=None, chain=True)
         sendmsg(wrong)
@@ -212,7 +225,7 @@ def check_Schedules():
                     schedules.append(schedule)
 
                     for pair in schedule['pairs']:
-                        threading.Thread(target=place_Order_On_Time, args=(datetime, pair)).start()
+                        threading.Thread(target=place_Order_On_Time, args=(datetime, pair, threading.active_count() + 1)).start()
                         sendmsg(f'found new announcement preparing schedule for {pair}')
             save_json(schedules_file, schedules)
     except Exception as exception:       
@@ -223,9 +236,11 @@ def check_Schedules():
 def sell():
     try:
         while True:
+            flag_update = False
+            not_sold_orders = []
             if os.path.exists(executed_trades_file):
                 order = load_json(executed_trades_file)
-
+            if len(order) > 0:
                 for coin in list(order):
 
                     # store some necesarry trade info for a sell
@@ -234,7 +249,6 @@ def sell():
                     coin_sl = coin['sl']
                     volume = coin['executedQty']
                     symbol = coin['symbol']
-                    not_sold_orders = []
 
                     last_price = get_price(symbol)
 
@@ -253,12 +267,11 @@ def sell():
                         coin['tp'] = new_tp
                         coin['sl'] = new_sl
                         not_sold_orders.append(coin)
-                        save_json(executed_trades_file, not_sold_orders)
+                        flag_update = True
 
                         sendmsg(f'updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)} for: {symbol}')
                     # close trade if tsl is reached or trail option is not enabled
                     elif float(last_price) < stored_price - (stored_price*sl /100) or float(last_price) > stored_price + (stored_price*tp /100) and not tsl_mode:
-
                         try:
 
                             # sell for real if test mode is set to false
@@ -267,6 +280,7 @@ def sell():
 
 
                             sendmsg(f"sold {symbol} at {(float(last_price) - stored_price) / float(stored_price)*100}")
+                            flag_update = True
                             # remove order from json file by not adding it
 
                         except Exception as exception:
@@ -283,7 +297,6 @@ def sell():
 
                             if not test_mode:
                                 sold_coins.append(sell)
-                                save_json(executed_sells_file, sold_coins)
                             else:
                                 sell = {
                                             'symbol':symbol,
@@ -293,8 +306,12 @@ def sell():
                                             'profit': float(last_price) - stored_price,
                                             'relative_profit': round((float(last_price) - stored_price) / stored_price*100, 3)
                                             }
+                                sold_coins.append(sell)
+                            save_json(executed_sells_file, sold_coins)
 
-                                save_json(executed_sells_file, sold_coins)
+                    else:
+                        not_sold_orders.append(coin)
+                    if flag_update: save_json(executed_trades_file, not_sold_orders)
             time.sleep(0.2)
     except Exception as exception:       
         wrong = traceback.format_exc(limit=None, chain=True)
@@ -317,6 +334,7 @@ def main():
 
     threading.Thread(target=check_Schedules, args=()).start()
     threading.Thread(target=sell, args=()).start()
+    threading.Thread(target=executed_orders, args=()).start()
     
     while True:
         new_Anouncements = get_Announcements()
@@ -327,7 +345,7 @@ def main():
                 if time_And_Pair[0] >= datetime.utcnow():
                     schedule_Order(time_And_Pair, announcement)
                     for pair in time_And_Pair[1]:
-                        threading.Thread(target=place_Order_On_Time, args=(time_And_Pair[0], pair)).start()
+                        threading.Thread(target=place_Order_On_Time, args=(time_And_Pair[0], pair, threading.active_count() + 1)).start()
                         sendmsg(f'found new announcement preparing schedule for {pair}')
         time.sleep(frequency)
 
