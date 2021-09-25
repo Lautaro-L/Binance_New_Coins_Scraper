@@ -1,16 +1,14 @@
 import os
 import re
 import time
-import json
 import requests
 import threading
-import logging
 import traceback
 from telegram import Bot, Chat
 from json_manage import *
 from binance_key import *
 from config import *
-from datetime import datetime
+from datetime import datetime, timedelta
 import dateutil.parser as dparser
 
 
@@ -60,6 +58,8 @@ ammount = cnf['TRADE_OPTIONS']['QUANTITY']
 frequency = cnf['TRADE_OPTIONS']['RUN_EVERY']
 
 test_mode = cnf['TRADE_OPTIONS']['TEST']
+delay_mode = cnf['TRADE_OPTIONS']['CONSIDER_DELAY']
+percentage = cnf['TRADE_OPTIONS']['PERCENTAGE']
 
 regex = '\S{2,6}?/'+ pairing
 
@@ -69,10 +69,13 @@ def sendmsg(message):
 
 
 def ping_binance():
-    time_before = datetime.timestamp(datetime.now())
-    client.ping()
-    time_after = datetime.timestamp(datetime.now())
-    return (time_after - time_before)
+    sum = 0
+    for i in range(3):
+        time_before = datetime.timestamp(datetime.now())
+        client.ping()
+        time_after = datetime.timestamp(datetime.now())
+        sum += (time_after - time_before)
+    return (sum / 3)
 
 ####announcements
 
@@ -147,6 +150,9 @@ def schedule_Order(time_And_Pair, announcement):
 
 def place_Order_On_Time(time_till_live, pair):
     try:
+        if delay_mode:
+            delay = (ping_binance() * percentage)
+            time_till_live = (time_till_live - timedelta(delay))
         time_to_wait = ((time_till_live - datetime.utcnow()).total_seconds() - 10)
         time_till_live = str(time_till_live)
         time.sleep(time_to_wait)
