@@ -154,7 +154,7 @@ def place_Order_On_Time(time_till_live, pair):
     try:
         if delay_mode:
             delay = (ping_binance() * percentage)
-            time_till_live = (time_till_live - timedelta(delay))
+            time_till_live = (time_till_live - timedelta(seconds = delay))
         time_to_wait = ((time_till_live - datetime.utcnow()).total_seconds() - 10)
         time_till_live = str(time_till_live)
         time.sleep(time_to_wait)
@@ -163,7 +163,7 @@ def place_Order_On_Time(time_till_live, pair):
         if test_mode:
             price = get_price(pair)
             while True:
-                if time_till_live == datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"):
+                if time_till_live == datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S:%f"):
                     order = {
                         "symbol": pair,
                         "transactTime": datetime.timestamp(datetime.now()),
@@ -178,7 +178,7 @@ def place_Order_On_Time(time_till_live, pair):
                     break
         else:
             while True:
-                if time_till_live == datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"):
+                if time_till_live == datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S:%f"):
                     order = create_order(pair, ammount, 'BUY')
                     break
         order['tp'] = tp
