@@ -1,0 +1,8 @@
+---
+  # CLIENT DETAILS
+  telegram_key: "paste key here"
+  chat_id: "paste id here"
+
+#rename this file to telegram.yml  if that file isnt present the code wont use telegram
+#to get the chat id you can visit this URL. https://api.telegram.org/botXXX:YYYYY/getUpdates (replace the XXX:YYYYY with your BOT HTTP API Token you just got from the Telegram BotFather)
+#to get the telegram key create a bot go here https://botostore.com/c/botfather/ 

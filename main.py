@@ -4,6 +4,8 @@ import time
 import json
 import requests
 import threading
+from telegram import Bot, Chat
+import telegram
 from json_manage import *
 from binance_key import *
 from config import *
@@ -28,6 +30,21 @@ executed_sells_file = 'executed_sells_trades.json'
 cnf = load_config('config.yml')
 client = load_binance_creds(r'auth.yml')
 
+telegram_status = True
+
+if os.path.exists('telegram.yml'):
+    global telegram_keys 
+    telegram_keys = load_config('telegram.yml')
+
+    global tbot
+    tbot = Bot(telegram_keys['telegram_key'])
+
+    global chat_id 
+    chat_id = telegram_keys['chat_id']
+
+    global chat 
+    chat = Chat(chat_id, "private", bot=tbot)
+else: telegram_status = False
 
 
 tp = cnf['TRADE_OPTIONS']['TP']
@@ -45,6 +62,9 @@ test_mode = cnf['TRADE_OPTIONS']['TEST']
 
 regex = '\S{2,6}?/'+ pairing
 
+def sendmsg(message):
+    if telegram_status:
+        threading.Thread(target=chat.send_message, args=(message,)).start()
 
 ####announcements
 
@@ -98,12 +118,13 @@ def create_order(pair, usdt_to_spend, action):
 
 
 def executed_order(order):
-    update_json(executed_trades_file, order)#needs more logic 
+    update_json(executed_trades_file, order)#needs more logic maybe to remove finished schedules tho is not critical
 
 
 def schedule_Order(time_And_Pair, announcement):
     scheduled_order = {'time':time_And_Pair[0].strftime("%Y-%m-%d %H:%M:%S"), 'pairs':time_And_Pair[1]}
 
+    sendmsg(f'scheduled an order for: {time_And_Pair[1]} at: {time_And_Pair[0]}')
     update_json(schedules_file, scheduled_order)
     update_json(file, announcement)
 
@@ -135,11 +156,14 @@ def place_Order_On_Time(time_till_live, pair):
     else:
         while True:
             if time_till_live == datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"):
-                #order = create_order(pair, ammount, 'BUY')
+                order = create_order(pair, ammount, 'BUY')
                 break
     order['tp'] = tp
     order['sl'] = sl
     executed_order(order)
+    amount = order['executedQty']
+    price =order['price']
+    sendmsg(f'bougth {amount} of {pair} at {price}')
 
 ######
 
@@ -163,7 +187,7 @@ def check_Schedules():
                 
                 for pair in schedule['pairs']:
                     threading.Thread(target=place_Order_On_Time, args=(datetime, pair)).start()
-        
+                    sendmsg(f'found new announcement preparing schedule for {pair}')
         save_json(schedules_file, schedules)
 
                 
@@ -204,7 +228,7 @@ def sell():
                     save_json(executed_trades_file, not_sold_orders)
 
                     print(f'updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)}')
-                    #sendmsg(f'updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)}')
+                    sendmsg(f'updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)}')
                 # close trade if tsl is reached or trail option is not enabled
                 elif float(last_price) < stored_price - (stored_price*sl /100) or float(last_price) > stored_price + (stored_price*tp /100) and not tsl_mode:
 
@@ -216,7 +240,7 @@ def sell():
 
 
                         print(f"sold {symbol} at {(float(last_price) - stored_price) / float(stored_price)*100}")
-                        #sendmsg(f"sold {coin} at {(float(last_price) - stored_price) / float(stored_price)*100}")
+                        sendmsg(f"sold {coin} at {(float(last_price) - stored_price) / float(stored_price)*100}")
                         # remove order from json file by not adding it
 
                     except Exception as e:
@@ -259,7 +283,7 @@ def main():
             time_And_Pair = get_Pair_and_DateTime(announcement['code'])
             if time_And_Pair[0] >= datetime.utcnow():
                 schedule_Order(time_And_Pair, announcement)
-                
+                sendmsg(f'found new announcement preparing schedule for {time_And_Pair[1]}')
         save_json(file, existing_Anouncements)
     
     threading.Thread(target=check_Schedules, args=()).start()
@@ -276,6 +300,7 @@ def main():
                     schedule_Order(time_And_Pair, announcement)
                     for pair in time_And_Pair[1]:
                         threading.Thread(target=place_Order_On_Time, args=(time_And_Pair[0], pair)).start()
+                        sendmsg(f'found new announcement preparing schedule for {pair}')
         time.sleep(frequency)
 
 
@@ -285,6 +310,7 @@ def main():
 
 
 if __name__ == '__main__':
+    sendmsg(f'starting')
     print('Starting')
     main()
 

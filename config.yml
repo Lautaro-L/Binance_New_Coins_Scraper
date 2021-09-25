@@ -8,5 +8,5 @@
     SL: 1
     TP: 1
     ENABLE_TSL: True
-    TSL: 1
-    TTP: 1
+    TSL: 0.5
+    TTP: 2
