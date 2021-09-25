@@ -228,7 +228,7 @@ def sell():
                     save_json(executed_trades_file, not_sold_orders)
 
                     print(f'updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)}')
-                    sendmsg(f'updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)}')
+                    sendmsg(f'updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)} for: {symbol}')
                 # close trade if tsl is reached or trail option is not enabled
                 elif float(last_price) < stored_price - (stored_price*sl /100) or float(last_price) > stored_price + (stored_price*tp /100) and not tsl_mode:
 
@@ -240,7 +240,7 @@ def sell():
 
 
                         print(f"sold {symbol} at {(float(last_price) - stored_price) / float(stored_price)*100}")
-                        sendmsg(f"sold {coin} at {(float(last_price) - stored_price) / float(stored_price)*100}")
+                        sendmsg(f"sold {symbol} at {(float(last_price) - stored_price) / float(stored_price)*100}")
                         # remove order from json file by not adding it
 
                     except Exception as e:
