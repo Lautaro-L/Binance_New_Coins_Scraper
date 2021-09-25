@@ -4,8 +4,9 @@ import time
 import json
 import requests
 import threading
+import logging
+import traceback
 from telegram import Bot, Chat
-import telegram
 from json_manage import *
 from binance_key import *
 from config import *
@@ -115,168 +116,182 @@ def get_price(coin):
      return client.get_ticker(symbol=coin)['lastPrice']
 
 def create_order(pair, usdt_to_spend, action):
-    return client.create_order(
-        symbol = pair,
-        side = action,
-        type = 'MARKET',
-        quoteOrderQty = usdt_to_spend,
-        recvWindow = "10000"
-    )
-
+    try:
+        order = client.create_order(
+            symbol = pair,
+            side = action,
+            type = 'MARKET',
+            quoteOrderQty = usdt_to_spend,
+            recvWindow = "10000"
+        )
+    except Exception as exception:       
+        wrong = traceback.format_exc(limit=None, chain=True)
+        sendmsg(wrong)
+    return order
 
 def executed_order(order):
     update_json(executed_trades_file, order)#needs more logic maybe to remove finished schedules tho is not critical
 
 
 def schedule_Order(time_And_Pair, announcement):
-    scheduled_order = {'time':time_And_Pair[0].strftime("%Y-%m-%d %H:%M:%S"), 'pairs':time_And_Pair[1]}
+    try:
+        scheduled_order = {'time':time_And_Pair[0].strftime("%Y-%m-%d %H:%M:%S"), 'pairs':time_And_Pair[1]}
 
-    sendmsg(f'scheduled an order for: {time_And_Pair[1]} at: {time_And_Pair[0]}')
-    update_json(schedules_file, scheduled_order)
-    update_json(file, announcement)
-
+        sendmsg(f'scheduled an order for: {time_And_Pair[1]} at: {time_And_Pair[0]}')
+        update_json(schedules_file, scheduled_order)
+        update_json(file, announcement)
+    except Exception as exception:       
+        wrong = traceback.format_exc(limit=None, chain=True)
+        sendmsg(wrong)
 
 
 def place_Order_On_Time(time_till_live, pair):
-    
-    time_to_wait = ((time_till_live - datetime.utcnow()).total_seconds() - 10)
-    time_till_live = str(time_till_live)
-    time.sleep(time_to_wait)
-    order = {}
+    try:
+        time_to_wait = ((time_till_live - datetime.utcnow()).total_seconds() - 10)
+        time_till_live = str(time_till_live)
+        time.sleep(time_to_wait)
+        order = {}
 
-    if test_mode:
-        price = get_price(pair)
-        while True:
-            if time_till_live == datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"):
-                order = {
-                    "symbol": pair,
-                    "transactTime": datetime.timestamp(datetime.now()),
-                    "price": price,
-                    "origQty": ammount/float(price),
-                    "executedQty": ammount/float(price),
-                    "cummulativeQuoteQty": ammount,
-                    "status": "FILLED",
-                    "type": "MARKET",
-                    "side": "BUY"
-                    }
-                break
-    else:
-        while True:
-            if time_till_live == datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"):
-                order = create_order(pair, ammount, 'BUY')
-                break
-    order['tp'] = tp
-    order['sl'] = sl
-    executed_order(order)
-    amount = order['executedQty']
-    price =order['price']
-    sendmsg(f'bougth {amount} of {pair} at {price}')
-
+        if test_mode:
+            price = get_price(pair)
+            while True:
+                if time_till_live == datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"):
+                    order = {
+                        "symbol": pair,
+                        "transactTime": datetime.timestamp(datetime.now()),
+                        "price": price,
+                        "origQty": ammount/float(price),
+                        "executedQty": ammount/float(price),
+                        "cummulativeQuoteQty": ammount,
+                        "status": "FILLED",
+                        "type": "MARKET",
+                        "side": "BUY"
+                        }
+                    break
+        else:
+            while True:
+                if time_till_live == datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"):
+                    order = create_order(pair, ammount, 'BUY')
+                    break
+        order['tp'] = tp
+        order['sl'] = sl
+        executed_order(order)
+        amount = order['executedQty']
+        price =order['price']
+        sendmsg(f'bougth {amount} of {pair} at {price}')
+    except Exception as exception:       
+        wrong = traceback.format_exc(limit=None, chain=True)
+        sendmsg(wrong)
 ######
 
 
 def check_Schedules():
-    
-    if os.path.exists(schedules_file):
-        unfiltered_schedules = load_json(schedules_file)
-        schedules = []
-        
-        for schedule in unfiltered_schedules:
-            
-            flag = True
-            datetime = dparser.parse(schedule['time'], fuzzy=True, ignoretz=True)
-            
-            if datetime < datetime.utcnow():
-                flag = False
-            
-            if flag:
-                schedules.append(schedule)
-                
-                for pair in schedule['pairs']:
-                    threading.Thread(target=place_Order_On_Time, args=(datetime, pair)).start()
-                    sendmsg(f'found new announcement preparing schedule for {pair}')
-        save_json(schedules_file, schedules)
+    try:
+        if os.path.exists(schedules_file):
+            unfiltered_schedules = load_json(schedules_file)
+            schedules = []
 
+            for schedule in unfiltered_schedules:
+
+                flag = True
+                datetime = dparser.parse(schedule['time'], fuzzy=True, ignoretz=True)
+
+                if datetime < datetime.utcnow():
+                    flag = False
+
+                if flag:
+                    schedules.append(schedule)
+
+                    for pair in schedule['pairs']:
+                        threading.Thread(target=place_Order_On_Time, args=(datetime, pair)).start()
+                        sendmsg(f'found new announcement preparing schedule for {pair}')
+            save_json(schedules_file, schedules)
+    except Exception as exception:       
+        wrong = traceback.format_exc(limit=None, chain=True)
+        sendmsg(wrong)
                 
 
 def sell():
+    try:
+        while True:
+            if os.path.exists(executed_trades_file):
+                order = load_json(executed_trades_file)
 
-    while True:
-        if os.path.exists(executed_trades_file):
-            order = load_json(executed_trades_file)
+                for coin in list(order):
 
-            for coin in list(order):
+                    # store some necesarry trade info for a sell
+                    stored_price = float(coin['price'])
+                    coin_tp = coin['tp']
+                    coin_sl = coin['sl']
+                    volume = coin['executedQty']
+                    symbol = coin['symbol']
+                    not_sold_orders = []
 
-                # store some necesarry trade info for a sell
-                stored_price = float(coin['price'])
-                coin_tp = coin['tp']
-                coin_sl = coin['sl']
-                volume = coin['executedQty']
-                symbol = coin['symbol']
-                not_sold_orders = []
+                    last_price = get_price(symbol)
 
-                last_price = get_price(symbol)
+                    # update stop loss and take profit values if threshold is reached
+                    if float(last_price) > stored_price + (stored_price * float(coin_tp) /100) and tsl_mode:
+                        # increase as absolute value for TP
+                        new_tp = float(last_price) + (float(last_price)*ttp /100)
+                        # convert back into % difference from when the coin was bought
+                        new_tp = float( (new_tp - stored_price) / stored_price*100)
 
-                # update stop loss and take profit values if threshold is reached
-                if float(last_price) > stored_price + (stored_price * float(coin_tp) /100) and tsl_mode:
-                    # increase as absolute value for TP
-                    new_tp = float(last_price) + (float(last_price)*ttp /100)
-                    # convert back into % difference from when the coin was bought
-                    new_tp = float( (new_tp - stored_price) / stored_price*100)
+                        # same deal as above, only applied to trailing SL
+                        new_sl = float(last_price) - (float(last_price)*tsl /100)
+                        new_sl = float((new_sl - stored_price) / stored_price*100)
 
-                    # same deal as above, only applied to trailing SL
-                    new_sl = float(last_price) - (float(last_price)*tsl /100)
-                    new_sl = float((new_sl - stored_price) / stored_price*100)
+                        # new values to be added to the json file
+                        coin['tp'] = new_tp
+                        coin['sl'] = new_sl
+                        not_sold_orders.append(coin)
+                        save_json(executed_trades_file, not_sold_orders)
 
-                    # new values to be added to the json file
-                    coin['tp'] = new_tp
-                    coin['sl'] = new_sl
-                    not_sold_orders.append(coin)
-                    save_json(executed_trades_file, not_sold_orders)
+                        print(f'updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)}')
+                        sendmsg(f'updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)} for: {symbol}')
+                    # close trade if tsl is reached or trail option is not enabled
+                    elif float(last_price) < stored_price - (stored_price*sl /100) or float(last_price) > stored_price + (stored_price*tp /100) and not tsl_mode:
 
-                    print(f'updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)}')
-                    sendmsg(f'updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)} for: {symbol}')
-                # close trade if tsl is reached or trail option is not enabled
-                elif float(last_price) < stored_price - (stored_price*sl /100) or float(last_price) > stored_price + (stored_price*tp /100) and not tsl_mode:
+                        try:
 
-                    try:
-
-                        # sell for real if test mode is set to false
-                        if not test_mode:
-                            sell = client.create_order(symbol = symbol, side = 'SELL', type = 'MARKET', quantity = volume, recvWindow = "10000")
+                            # sell for real if test mode is set to false
+                            if not test_mode:
+                                sell = client.create_order(symbol = symbol, side = 'SELL', type = 'MARKET', quantity = volume, recvWindow = "10000")
 
 
-                        print(f"sold {symbol} at {(float(last_price) - stored_price) / float(stored_price)*100}")
-                        sendmsg(f"sold {symbol} at {(float(last_price) - stored_price) / float(stored_price)*100}")
-                        # remove order from json file by not adding it
+                            print(f"sold {symbol} at {(float(last_price) - stored_price) / float(stored_price)*100}")
+                            sendmsg(f"sold {symbol} at {(float(last_price) - stored_price) / float(stored_price)*100}")
+                            # remove order from json file by not adding it
 
-                    except Exception as e:
-                        print(e)
+                        except Exception as exception:
+                            wrong = traceback.format_exc(limit=None, chain=True)
+                            sendmsg(wrong)
 
-                    # store sold trades data
-                    else:
-                        if os.path.exists(executed_sells_file):
-                            sold_coins = load_json(executed_sells_file)
-
+                        # store sold trades data
                         else:
-                            sold_coins = []
+                            if os.path.exists(executed_sells_file):
+                                sold_coins = load_json(executed_sells_file)
 
-                        if not test_mode:
-                            sold_coins.append(sell)
-                            save_json(executed_sells_file, sold_coins)
-                        else:
-                            sell = {
-                                        'symbol':symbol,
-                                        'price':last_price,
-                                        'volume':volume,
-                                        'time':datetime.timestamp(datetime.now()),
-                                        'profit': float(last_price) - stored_price,
-                                        'relative_profit': round((float(last_price) - stored_price) / stored_price*100, 3)
-                                        }
+                            else:
+                                sold_coins = []
 
-                            save_json(executed_sells_file, sold_coins)
-        time.sleep(0.2)          
+                            if not test_mode:
+                                sold_coins.append(sell)
+                                save_json(executed_sells_file, sold_coins)
+                            else:
+                                sell = {
+                                            'symbol':symbol,
+                                            'price':last_price,
+                                            'volume':volume,
+                                            'time':datetime.timestamp(datetime.now()),
+                                            'profit': float(last_price) - stored_price,
+                                            'relative_profit': round((float(last_price) - stored_price) / stored_price*100, 3)
+                                            }
 
+                                save_json(executed_sells_file, sold_coins)
+            time.sleep(0.2)
+    except Exception as exception:       
+        wrong = traceback.format_exc(limit=None, chain=True)
+        sendmsg(wrong)
 
 
 def main():
@@ -292,10 +307,9 @@ def main():
                 schedule_Order(time_And_Pair, announcement)
                 sendmsg(f'found new announcement preparing schedule for {time_And_Pair[1]}')
         save_json(file, existing_Anouncements)
-    
+
     threading.Thread(target=check_Schedules, args=()).start()
     threading.Thread(target=sell, args=()).start()
-    
     
     while True:
         new_Anouncements = get_Announcements()
@@ -317,10 +331,14 @@ def main():
 
 
 if __name__ == '__main__':
-    sendmsg(f'starting')
-    print('Starting')
-    print(ping_binance())
-    main()
+    try:
+        sendmsg(f'starting')
+        print('Starting')
+        print(ping_binance())
+        main()
+    except Exception as exception:
+        wrong = traceback.format_exc(limit=None, chain=True)
+        sendmsg(wrong)
 
 
 
