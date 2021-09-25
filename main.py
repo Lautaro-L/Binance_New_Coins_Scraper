@@ -66,6 +66,13 @@ def sendmsg(message):
     if telegram_status:
         threading.Thread(target=chat.send_message, args=(message,)).start()
 
+
+def ping_binance():
+    time_before = datetime.timestamp(datetime.now())
+    client.ping()
+    time_after = datetime.timestamp(datetime.now())
+    return (time_after - time_before)
+
 ####announcements
 
 def get_Announcements():
@@ -268,7 +275,7 @@ def sell():
                                         }
 
                             save_json(executed_sells_file, sold_coins)
-        time.sleep(1)          
+        time.sleep(0.2)          
 
 
 
@@ -312,6 +319,7 @@ def main():
 if __name__ == '__main__':
     sendmsg(f'starting')
     print('Starting')
+    print(ping_binance())
     main()
 
 
