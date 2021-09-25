@@ -339,7 +339,7 @@ def main():
 if __name__ == '__main__':
     try:
         sendmsg(f'starting')
-        sendmsg('Aproximate delay: {ping_binance()}')
+        sendmsg(f'Aproximate delay: {ping_binance()}')
         main()
     except Exception as exception:
         wrong = traceback.format_exc(limit=None, chain=True)
