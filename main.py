@@ -154,7 +154,7 @@ def schedule_Order(time_And_Pair, announcement):
     try:
         scheduled_order = {'time':time_And_Pair[0].strftime("%Y-%m-%d %H:%M:%S"), 'pairs':time_And_Pair[1]}
 
-        sendmsg(f'scheduled an order for: {time_And_Pair[1]} at: {time_And_Pair[0]}')
+        sendmsg(f'Scheduled an order for: {time_And_Pair[1]} at: {time_And_Pair[0]}')
         update_json(schedules_file, scheduled_order)
         update_json(file, announcement)
     except Exception as exception:       
@@ -199,7 +199,7 @@ def place_Order_On_Time(time_till_live, pair, threads):
         order['sl'] = sl
         amount = order['executedQty']
         price =order['price']
-        sendmsg(f'bougth {amount} of {pair} at {price}')
+        sendmsg(f'Bougth {amount} of {pair} at {price}')
         executed_queque.append(order)
     except Exception as exception:       
         wrong = traceback.format_exc(limit=None, chain=True)
@@ -226,7 +226,7 @@ def check_Schedules():
 
                     for pair in schedule['pairs']:
                         threading.Thread(target=place_Order_On_Time, args=(datetime, pair, threading.active_count() + 1)).start()
-                        sendmsg(f'found new announcement preparing schedule for {pair}')
+                        sendmsg(f'Found scheduled order for: {pair} adding it to new thread')
             save_json(schedules_file, schedules)
     except Exception as exception:       
         wrong = traceback.format_exc(limit=None, chain=True)
@@ -269,7 +269,7 @@ def sell():
                         not_sold_orders.append(coin)
                         flag_update = True
 
-                        sendmsg(f'updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)} for: {symbol}')
+                        sendmsg(f'Updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)} for: {symbol}')
                     # close trade if tsl is reached or trail option is not enabled
                     elif float(last_price) < stored_price - (stored_price*sl /100) or float(last_price) > stored_price + (stored_price*tp /100) and not tsl_mode:
                         try:
@@ -279,7 +279,7 @@ def sell():
                                 sell = client.create_order(symbol = symbol, side = 'SELL', type = 'MARKET', quantity = volume, recvWindow = "10000")
 
 
-                            sendmsg(f"sold {symbol} at {(float(last_price) - stored_price) / float(stored_price)*100}")
+                            sendmsg(f"Sold {symbol} at {(float(last_price) - stored_price) / float(stored_price)*100}")
                             flag_update = True
                             # remove order from json file by not adding it
 
@@ -329,7 +329,7 @@ def main():
             time_And_Pair = get_Pair_and_DateTime(announcement['code'])
             if time_And_Pair[0] >= datetime.utcnow():
                 schedule_Order(time_And_Pair, announcement)
-                sendmsg(f'found new announcement preparing schedule for {time_And_Pair[1]}')
+                sendmsg(f'Found new announcement preparing schedule for: {time_And_Pair[1]}')
         save_json(file, existing_Anouncements)
 
     threading.Thread(target=check_Schedules, args=()).start()
@@ -346,7 +346,9 @@ def main():
                     schedule_Order(time_And_Pair, announcement)
                     for pair in time_And_Pair[1]:
                         threading.Thread(target=place_Order_On_Time, args=(time_And_Pair[0], pair, threading.active_count() + 1)).start()
-                        sendmsg(f'found new announcement preparing schedule for {pair}')
+                        sendmsg(f'Found new announcement preparing schedule for {pair}')
+        sendmsg(f'Done checking announcements going to sleep for: {frequency} seconds')
+        sendmsg(f'Current Average delay: {ping_binance()}')
         time.sleep(frequency)
 
 
