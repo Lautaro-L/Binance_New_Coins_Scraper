@@ -238,6 +238,7 @@ def sell():
         while True:
             flag_update = False
             not_sold_orders = []
+            order = []
             if os.path.exists(executed_trades_file):
                 order = load_json(executed_trades_file)
             if len(order) > 0:
