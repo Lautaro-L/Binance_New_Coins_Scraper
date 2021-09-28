@@ -234,8 +234,8 @@ def check_Schedules():
                 
 
 def sell():
-    try:
-        while True:
+    while True:
+        try:
             flag_update = False
             not_sold_orders = []
             order = []
@@ -314,9 +314,9 @@ def sell():
                         not_sold_orders.append(coin)
                     if flag_update: save_json(executed_trades_file, not_sold_orders)
             time.sleep(0.2)
-    except Exception as exception:       
-        wrong = traceback.format_exc(limit=None, chain=True)
-        sendmsg(wrong)
+        except Exception as exception:       
+            wrong = traceback.format_exc(limit=None, chain=True)
+            sendmsg(wrong)
 
 
 def main():
