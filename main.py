@@ -5,7 +5,6 @@ import json
 import requests
 import threading
 import traceback
-from telegram import Bot, Chat
 from json_manage import *
 from binance_key import *
 from config import *
@@ -26,25 +25,74 @@ executed_trades_file = 'executed_trades.json'
 executed_sells_file = 'executed_sells_trades.json'
 
 executed_queque = []
+pair_Dict = {}
 
 cnf = load_config('config.yml')
 client = load_binance_creds(r'auth.yml')
 
 telegram_status = True
 
+telegram_keys=[]
+
 if os.path.exists('telegram.yml'):
-    global telegram_keys 
     telegram_keys = load_config('telegram.yml')
 
-    global tbot
-    tbot = Bot(telegram_keys['telegram_key'])
-
-    global chat_id 
-    chat_id = telegram_keys['chat_id']
-
-    global chat 
-    chat = Chat(chat_id, "private", bot=tbot)
 else: telegram_status = False
+
+
+def telegram_bot_sendtext(bot_message):
+
+    send_text = 'https://api.telegram.org/bot' + str(telegram_keys['telegram_key']) + '/sendMessage?chat_id=' + str(telegram_keys['chat_id']) + '&parse_mode=Markdown&text=' + bot_message
+    response = requests.get(send_text)
+    return response.json()['result']['message_id']
+
+def telegram_delete_message(message_id):
+
+    send_text = 'https://api.telegram.org/bot' + str(telegram_keys['telegram_key']) + '/deleteMessage?chat_id=' + str(telegram_keys['chat_id']) + '&message_id=' + str(message_id)
+
+    requests.get(send_text)
+
+
+class Send_Without_Spamming():
+    
+    def __init__(self):
+        self.id =0000
+        self.first = True
+    
+    def send(self, message):
+        if telegram_status:
+            if self.first:
+                self.first = False
+                self.id = telegram_bot_sendtext(message)
+            else:
+                telegram_delete_message(self.id)
+                self.id = telegram_bot_sendtext(message)
+        else:
+            print(message)
+        
+    def kill(self, pair):
+        if telegram_status:
+            telegram_delete_message(self.id)
+            del pair_Dict[pair] 
+
+
+def killSpam(pair):
+    try:
+        pair_Dict[pair].kill(pair)
+    except Exception:
+        pass
+        
+
+
+def sendSpam(pair, message):
+    try:
+        pair_Dict[pair].send(message)
+    except Exception:
+        pair_Dict[pair] = Send_Without_Spamming()
+        pair_Dict[pair].send(message)
+
+
+
 
 
 tp = cnf['TRADE_OPTIONS']['TP']
@@ -66,7 +114,7 @@ regex = '\S{2,6}?/'+ pairing
 
 def sendmsg(message):
     if telegram_status:
-        threading.Thread(target=chat.send_message, args=(message,)).start()
+        threading.Thread(target=telegram_bot_sendtext, args=(message,)).start()
     else:
         print(message)
 
@@ -270,7 +318,7 @@ def sell():
                         not_sold_orders.append(coin)
                         flag_update = True
 
-                        sendmsg(f'Updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)} for: {symbol}')
+                        threading.Thread(target=sendSpam, args=(symbol, f'Updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)} for: {symbol}')).start()
                     # close trade if tsl is reached or trail option is not enabled
                     elif float(last_price) < stored_price - (stored_price*sl /100) or float(last_price) > stored_price + (stored_price*tp /100) and not tsl_mode:
                         try:
@@ -281,6 +329,7 @@ def sell():
 
 
                             sendmsg(f"Sold {symbol} at {(float(last_price) - stored_price) / float(stored_price)*100}")
+                            killSpam(symbol)
                             flag_update = True
                             # remove order from json file by not adding it
 
@@ -348,19 +397,19 @@ def main():
                     for pair in time_And_Pair[1]:
                         threading.Thread(target=place_Order_On_Time, args=(time_And_Pair[0], pair, threading.active_count() + 1)).start()
                         sendmsg(f'Found new announcement preparing schedule for {pair}')
-        sendmsg(f'Done checking announcements going to sleep for: {frequency} seconds')
-        sendmsg(f'Current Average delay: {ping_binance()}')
+        
+        threading.Thread(target=sendSpam, args=("sleep", f'Done checking announcements going to sleep for: {frequency} seconds&disable_notification=true')).start()
+        threading.Thread(target=sendSpam, args=("ping", f'Current Average delay: {ping_binance()}&disable_notification=true')).start()
         time.sleep(frequency)
 
 
 #TODO:
 # posible integration with AWS lambda ping it time before the coin is listed so it can place a limit order a little bti more than opening price
-# once the code its better add support to other exchanges
 
 
 if __name__ == '__main__':
     try:
-        sendmsg(f'starting')
+        sendmsg('starting')
         sendmsg(f'Aproximate delay: {ping_binance()}')
         main()
     except Exception as exception:
