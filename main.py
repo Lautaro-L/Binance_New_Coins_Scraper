@@ -392,12 +392,12 @@ def main():
         for announcement in new_Anouncements:
             if not announcement in existing_Anouncements:
                 time_And_Pair = get_Pair_and_DateTime(announcement['code'])
-                existing_Anouncements = load_json(file)
                 if time_And_Pair[0] >= datetime.utcnow():
                     schedule_Order(time_And_Pair, announcement)
                     for pair in time_And_Pair[1]:
                         threading.Thread(target=place_Order_On_Time, args=(time_And_Pair[0], pair, threading.active_count() + 1)).start()
                         sendmsg(f'Found new announcement preparing schedule for {pair}')
+                existing_Anouncements = load_json(file)
         
         threading.Thread(target=sendSpam, args=("sleep", f'Done checking announcements going to sleep for: {frequency} seconds&disable_notification=true')).start()
         threading.Thread(target=sendSpam, args=("ping", f'Current Average delay: {ping_binance()}&disable_notification=true')).start()
