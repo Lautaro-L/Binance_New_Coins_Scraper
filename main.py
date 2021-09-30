@@ -410,6 +410,8 @@ def main():
 
 if __name__ == '__main__':
     try:
+        if not test_mode:
+            sendmsg('Warning runnig it on live mode')
         sendmsg('starting')
         sendmsg(f'Aproximate delay: {ping_binance()}')
         main()
