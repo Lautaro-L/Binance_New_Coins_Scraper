@@ -388,10 +388,11 @@ def main():
     
     while True:
         new_Anouncements = get_Announcements()
-
+        
         for announcement in new_Anouncements:
             if not announcement in existing_Anouncements:
                 time_And_Pair = get_Pair_and_DateTime(announcement['code'])
+                existing_Anouncements = load_json(file)
                 if time_And_Pair[0] >= datetime.utcnow():
                     schedule_Order(time_And_Pair, announcement)
                     for pair in time_And_Pair[1]:
