@@ -13,8 +13,9 @@ import dateutil.parser as dparser
 
 
 
-ARTICLES_URL = 'https://www.binance.com/bapi/composite/v1/public/cms/article/catalog/list/query?catalogId=48&pageNo=1&pageSize=15'
+ARTICLES_URL = 'https://www.binance.com/bapi/composite/v1/public/cms/article/catalog/list/query?catalogId=48&pageNo=1&pageSize=30'
 ARTICLE      = 'https://www.binance.com/bapi/composite/v1/public/cms/article/detail/query?articleCode='
+existing_assets = ["BTC","LTC","ETH","NEO","BNB","QTUM","EOS","SNT","BNT","GAS","BCC","USDT","HSR","OAX","DNT","MCO","ICN","ZRX","OMG","WTC","YOYO","LRC","TRX","SNGLS","STRAT","BQX","FUN","KNC","CDT","XVG","IOTA","SNM","LINK","CVC","TNT","REP","MDA","MTL","SALT","NULS","SUB","STX","MTH","ADX","ETC","ENG","ZEC","AST","GNT","DGD","BAT","DASH","POWR","BTG","REQ","XMR","EVX","VIB","ENJ","VEN","ARK","XRP","MOD","STORJ","KMD","RCN","EDO","DATA","DLT","MANA","PPT","RDN","GXS","AMB","ARN","BCPT","CND","GVT","POE","BTS","FUEL","XZC","QSP","LSK","BCD","TNB","ADA","LEND","XLM","CMT","WAVES","WABI","GTO","ICX","OST","ELF","AION","WINGS","BRD","NEBL","NAV","VIBE","LUN","TRIG","APPC","CHAT","RLC","INS","PIVX","IOST","STEEM","NANO","AE","VIA","BLZ","SYS","RPX","NCASH","POA","ONT","ZIL","STORM","XEM","WAN","WPR","QLC","GRS","CLOAK","LOOM","BCN","TUSD","ZEN","SKY","THETA","IOTX","QKC","AGI","NXS","SC","NPXS","KEY","NAS","MFT","DENT","IQ","ARDR","HOT","VET","DOCK","POLY","VTHO","ONG","PHX","HC","GO","PAX","RVN","DCR","USDC","MITH","BCHABC","BCHSV","REN","BTT","USDS","FET","TFUEL","CELR","MATIC","ATOM","PHB","ONE","FTM","BTCB","USDSB","CHZ","COS","ALGO","ERD","DOGE","BGBP","DUSK","ANKR","WIN","TUSDB","COCOS","PERL","TOMO","BUSD","BAND","BEAM","HBAR","XTZ","NGN","DGB","NKN","GBP","EUR","KAVA","RUB","UAH","ARPA","TRY","CTXC","AERGO","BCH","TROY","BRL","VITE","FTT","AUD","OGN","DREP","BULL","BEAR","ETHBULL","ETHBEAR","XRPBULL","XRPBEAR","EOSBULL","EOSBEAR","TCT","WRX","LTO","ZAR","MBL","COTI","BKRW","BNBBULL","BNBBEAR","HIVE","STPT","SOL","IDRT","CTSI","CHR","BTCUP","BTCDOWN","HNT","JST","FIO","BIDR","STMX","MDT","PNT","COMP","IRIS","MKR","SXP","SNX","DAI","ETHUP","ETHDOWN","ADAUP","ADADOWN","LINKUP","LINKDOWN","DOT","RUNE","BNBUP","BNBDOWN","XTZUP","XTZDOWN","AVA","BAL","YFI","SRM","ANT","CRV","SAND","OCEAN","NMR","LUNA","IDEX","RSR","PAXG","WNXM","TRB","EGLD","BZRX","WBTC","KSM","SUSHI","YFII","DIA","BEL","UMA","EOSUP","TRXUP","EOSDOWN","TRXDOWN","XRPUP","XRPDOWN","DOTUP","DOTDOWN","NBS","WING","SWRV","LTCUP","LTCDOWN","CREAM","UNI","OXT","SUN","AVAX","BURGER","BAKE","FLM","SCRT","XVS","CAKE","SPARTA","UNIUP","UNIDOWN","ALPHA","ORN","UTK","NEAR","VIDT","AAVE","FIL","SXPUP","SXPDOWN","INJ","FILDOWN","FILUP","YFIUP","YFIDOWN","CTK","EASY","AUDIO","BCHUP","BCHDOWN","BOT","AXS","AKRO","HARD","KP3R","RENBTC","SLP","STRAX","UNFI","CVP","BCHA","FOR","FRONT","ROSE","HEGIC","AAVEUP","AAVEDOWN","PROM","BETH","SKL","GLM","SUSD","COVER","GHST","SUSHIUP","SUSHIDOWN","XLMUP","XLMDOWN","DF","JUV","PSG","BVND","GRT","CELO","TWT","REEF","OG","ATM","ASR","1INCH","RIF","BTCST","TRU","DEXE","CKB","FIRO","LIT","PROS","VAI","SFP","FXS","DODO","AUCTION","UFT","ACM","PHA","TVK","BADGER","FIS","OM","POND","ALICE","DEGO","BIFI","LINA"]
 
 key_words = ['Futures', 'Isolated', 'Margin', 'Launchpool', 'Launchpad', 'Cross', 'Perpetual']
 filter_List = ['body', 'type', 'catalogId', 'catalogName', 'publishDate']
@@ -110,9 +111,11 @@ test_mode = cnf['TRADE_OPTIONS']['TEST']
 delay_mode = cnf['TRADE_OPTIONS']['CONSIDER_DELAY']
 percentage = cnf['TRADE_OPTIONS']['PERCENTAGE']
 
+existing_assets.remove(pairing)
 regex = '\S{2,6}?/'+ pairing
 
 def sendmsg(message):
+    print(message)
     if telegram_status:
         threading.Thread(target=telegram_bot_sendtext, args=(message,)).start()
     else:
@@ -154,14 +157,24 @@ def get_Announcements():
 def get_Pair_and_DateTime(ARTICLE_CODE):
     
     new_Coin = requests.get(ARTICLE+ARTICLE_CODE).json()['data']['seoDesc']
-    datetime = dparser.parse(new_Coin, fuzzy=True, ignoretz=True)
+    try:
+        datetime = dparser.parse(new_Coin, fuzzy=True, ignoretz=True)
     
-    raw_pairs = re.findall(regex, new_Coin)
-    pairs = []
-    
-    for pair in raw_pairs:
-        pairs.append(pair.replace('/', ''))
-    return [datetime, pairs]
+        raw_pairs = re.findall(regex, new_Coin)
+        pairs = []
+
+        for pair in raw_pairs:
+            present= False
+            for j in existing_assets:
+                if j in pair:
+                    present = True
+                    break
+            if present == False:
+                pairs.append(pair.replace('/', ''))
+        return [datetime, pairs]
+    except Exception as e:
+        print(e)
+        return None
     
 
 ####orders
@@ -377,9 +390,10 @@ def main():
         existing_Anouncements = get_Announcements()
         for announcement in existing_Anouncements:
             time_And_Pair = get_Pair_and_DateTime(announcement['code'])
-            if time_And_Pair[0] >= datetime.utcnow():
-                schedule_Order(time_And_Pair, announcement)
-                sendmsg(f'Found new announcement preparing schedule for: {time_And_Pair[1]}')
+            if time_And_Pair is not None:
+                if time_And_Pair[0] >= datetime.utcnow()  and len(time_And_Pair[1]) > 0:
+                    schedule_Order(time_And_Pair, announcement)
+                    sendmsg(f'Found new announcement preparing schedule for: {time_And_Pair[1]}')
         save_json(file, existing_Anouncements)
 
     threading.Thread(target=check_Schedules, args=()).start()
@@ -392,11 +406,12 @@ def main():
         for announcement in new_Anouncements:
             if not announcement in existing_Anouncements:
                 time_And_Pair = get_Pair_and_DateTime(announcement['code'])
-                if time_And_Pair[0] >= datetime.utcnow():
-                    schedule_Order(time_And_Pair, announcement)
-                    for pair in time_And_Pair[1]:
-                        threading.Thread(target=place_Order_On_Time, args=(time_And_Pair[0], pair, threading.active_count() + 1)).start()
-                        sendmsg(f'Found new announcement preparing schedule for {pair}')
+                if time_And_Pair is not None:
+                    if time_And_Pair[0] >= datetime.utcnow() and len(time_And_Pair[1]) > 0 :
+                        schedule_Order(time_And_Pair, announcement)
+                        for pair in time_And_Pair[1]:
+                            threading.Thread(target=place_Order_On_Time, args=(time_And_Pair[0], pair, threading.active_count() + 1)).start()
+                            sendmsg(f'Found new announcement preparing schedule for {pair}')
                 existing_Anouncements = load_json(file)
         
         threading.Thread(target=sendSpam, args=("sleep", f'Done checking announcements going to sleep for: {frequency} seconds&disable_notification=true')).start()
