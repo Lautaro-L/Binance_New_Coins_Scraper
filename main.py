@@ -260,6 +260,8 @@ def place_Order_On_Time(time_till_live, pair, threads):
         order['sl'] = sl
         amount = order['executedQty']
         price =order['price']
+        if price <= 0.00001:
+            price = get_price(pair)
         sendmsg(f'Bougth {amount} of {pair} at {price}')
         executed_queque.append(order)
     except Exception as exception:       
@@ -306,10 +308,10 @@ def sell():
                 for coin in list(order):
 
                     # store some necesarry trade info for a sell
-                    stored_price = float(coin['price'])
+                    stored_price = float(coin['fills'][0]['price'])
                     coin_tp = coin['tp']
                     coin_sl = coin['sl']
-                    volume = coin['executedQty']
+                    volume = round(float(coin['executedQty']) - float(coin['fills'][0]['commission']),2)
                     symbol = coin['symbol']
 
                     last_price = get_price(symbol)
