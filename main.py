@@ -23,9 +23,11 @@ file = 'announcements.json'
 schedules_file = 'scheduled_order.json'
 executed_trades_file = 'executed_trades.json'
 executed_sells_file = 'executed_sells_trades.json'
+coins_file = 'existing_coins.json'
 
-executed_queque = []
 pair_Dict = {}
+existing_coins = []
+executed_queque = []
 
 cnf = load_config('config.yml')
 client = load_binance_creds(r'auth.yml')
@@ -113,10 +115,9 @@ percentage = cnf['TRADE_OPTIONS']['PERCENTAGE']
 regex = '\S{2,6}?/'+ pairing
 
 def sendmsg(message):
+    print(message)
     if telegram_status:
         threading.Thread(target=telegram_bot_sendtext, args=(message,)).start()
-    else:
-        print(message)
 
 
 def ping_binance():
@@ -127,6 +128,20 @@ def ping_binance():
         time_after = datetime.timestamp(datetime.now())
         sum += (time_after - time_before)
     return (sum / 3)
+
+
+def getAllExistingCoins():
+    global existing_coins
+    if os.path.exists(coins_file):
+        existing_coins = load_json(coins_file)
+    else:
+        allPairs = client.get_all_tickers()
+        for coin in allPairs:
+            if pairing in coin['symbol']:
+                coin = re.sub( pairing, '', coin['symbol'])
+                existing_coins.append(coin)
+        save_json(coins_file, existing_coins)
+
 
 ####announcements
 
@@ -152,17 +167,24 @@ def get_Announcements():
 
 
 def get_Pair_and_DateTime(ARTICLE_CODE):
-    
-    new_Coin = requests.get(ARTICLE+ARTICLE_CODE).json()['data']['seoDesc']
-    datetime = dparser.parse(new_Coin, fuzzy=True, ignoretz=True)
-    
-    raw_pairs = re.findall(regex, new_Coin)
-    pairs = []
-    
-    for pair in raw_pairs:
-        pairs.append(pair.replace('/', ''))
-    return [datetime, pairs]
-    
+    try: 
+        new_Coin = requests.get(ARTICLE+ARTICLE_CODE).json()['data']['seoDesc']
+        datetime = dparser.parse(new_Coin, fuzzy=True, ignoretz=True)
+
+        raw_pairs = re.findall(regex, new_Coin)
+        pairs = []
+
+        for pair in raw_pairs:
+            present= False
+            for existing_coin in existing_coins:
+                if existing_coin in pair:
+                    present = True
+                    break
+            if present == False:
+                pairs.append(pair.replace('/', ''))
+        return [datetime, pairs]
+    except Exception as e:
+        sendmsg(e)
 
 ####orders
 
@@ -224,6 +246,8 @@ def place_Order_On_Time(time_till_live, pair, threads):
 
         if test_mode:
             price = get_price(pair)
+            if price <= 0.00001:
+                price = get_price(pair)
             while True:
                 if (datetime.utcnow() - timedelta(seconds = 1) <= time_till_live <= datetime.utcnow() - timedelta(seconds = delay * 0.9)):
                     order = {
@@ -274,7 +298,7 @@ def check_Schedules():
 
                     for pair in schedule['pairs']:
                         threading.Thread(target=place_Order_On_Time, args=(datetime, pair, threading.active_count() + 1)).start()
-                        sendmsg(f'Found scheduled order for: {pair} adding it to new thread')
+                        sendmsg(f'Found scheduled order for: {pair} at: {datetime} adding it to new thread')
             save_json(schedules_file, schedules)
     except Exception as exception:       
         wrong = traceback.format_exc(limit=None, chain=True)
@@ -369,6 +393,7 @@ def sell():
 
 
 def main():
+    getAllExistingCoins()
 
     if os.path.exists(file):
         existing_Anouncements = load_json(file)
@@ -377,9 +402,12 @@ def main():
         existing_Anouncements = get_Announcements()
         for announcement in existing_Anouncements:
             time_And_Pair = get_Pair_and_DateTime(announcement['code'])
-            if time_And_Pair[0] >= datetime.utcnow():
-                schedule_Order(time_And_Pair, announcement)
-                sendmsg(f'Found new announcement preparing schedule for: {time_And_Pair[1]}')
+            if time_And_Pair is not None:
+                if time_And_Pair[0] >= datetime.utcnow() and len(time_And_Pair[1]) > 0:
+                    schedule_Order(time_And_Pair, announcement)
+                    for pair in time_And_Pair[1]:
+                        threading.Thread(target=place_Order_On_Time, args=(time_And_Pair[0], pair, threading.active_count() + 1)).start()
+                        sendmsg(f'Found new announcement preparing schedule for: {time_And_Pair[1]}')
         save_json(file, existing_Anouncements)
 
     threading.Thread(target=check_Schedules, args=()).start()
@@ -392,11 +420,12 @@ def main():
         for announcement in new_Anouncements:
             if not announcement in existing_Anouncements:
                 time_And_Pair = get_Pair_and_DateTime(announcement['code'])
-                if time_And_Pair[0] >= datetime.utcnow():
-                    schedule_Order(time_And_Pair, announcement)
-                    for pair in time_And_Pair[1]:
-                        threading.Thread(target=place_Order_On_Time, args=(time_And_Pair[0], pair, threading.active_count() + 1)).start()
-                        sendmsg(f'Found new announcement preparing schedule for {pair}')
+                if time_And_Pair is not None:
+                    if time_And_Pair[0] >= datetime.utcnow():
+                        schedule_Order(time_And_Pair, announcement)
+                        for pair in time_And_Pair[1]:
+                            threading.Thread(target=place_Order_On_Time, args=(time_And_Pair[0], pair, threading.active_count() + 1)).start()
+                            sendmsg(f'Found new announcement preparing schedule for {pair}')
                 existing_Anouncements = load_json(file)
         
         threading.Thread(target=sendSpam, args=("sleep", f'Done checking announcements going to sleep for: {frequency} seconds&disable_notification=true')).start()

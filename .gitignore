@@ -4,9 +4,10 @@ __pycache__/
 *$py.class
 
 #files
+auth.yml
+telegram.yml
 announcements.json
+existing_coins.json
 scheduled_order.json
 executed_trades.json
 executed_sells_trades.json
-auth.yml
-telegram.yml
