@@ -188,6 +188,14 @@ def get_Pair_and_DateTime(ARTICLE_CODE):
 
 ####orders
 
+def avFills(order):
+    prices = 0
+    qty = 0
+    for fill in order['fills']:
+        prices += (float(fill['price']) * float(fill['qty']))
+        qty += float(fill['qty'])
+    return prices / qty
+
 def get_price(coin):
      return client.get_ticker(symbol=coin)['lastPrice']
 
@@ -267,11 +275,12 @@ def place_Order_On_Time(time_till_live, pair, threads):
             while True:
                 if (datetime.utcnow() - timedelta(seconds = 1) <= time_till_live <= datetime.utcnow() - timedelta(seconds = delay * 0.9)):
                     order = create_order(pair, ammount, 'BUY')
+                    order['price'] = avFills(order)
                     break
         order['tp'] = tp
         order['sl'] = sl
         amount = order['executedQty']
-        price =order['price']
+        price = order['price']
         sendmsg(f'Bougth {amount} of {pair} at {price}')
         executed_queque.append(order)
     except Exception as exception:       
@@ -387,10 +396,10 @@ def sell():
                     else:
                         not_sold_orders.append(coin)
                     if flag_update: save_json(executed_trades_file, not_sold_orders)
-            time.sleep(0.2)
         except Exception as exception:       
             wrong = traceback.format_exc(limit=None, chain=True)
             sendmsg(wrong)
+        time.sleep(0.2)
 
 
 def main():
