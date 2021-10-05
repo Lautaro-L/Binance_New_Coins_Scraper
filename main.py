@@ -167,24 +167,20 @@ def get_Announcements():
 
 
 def get_Pair_and_DateTime(ARTICLE_CODE):
-    try: 
-        new_Coin = requests.get(ARTICLE+ARTICLE_CODE).json()['data']['seoDesc']
+    
+    new_Coin = requests.get(ARTICLE+ARTICLE_CODE).json()['data']['seoDesc']
+    # TODO: parse breaks when there are 2 dates in a string with time. 
+    try:
         datetime = dparser.parse(new_Coin, fuzzy=True, ignoretz=True)
-
         raw_pairs = re.findall(regex, new_Coin)
         pairs = []
-
         for pair in raw_pairs:
-            present= False
-            for existing_coin in existing_coins:
-                if existing_coin in pair:
-                    present = True
-                    break
-            if present == False:
+            if not pair.split('/')[0] in existing_coins:
                 pairs.append(pair.replace('/', ''))
-        return [datetime, pairs]
+        return [datetime, pairs]        
     except Exception as e:
-        sendmsg(e)
+        sendmsg("[!] The article with url " + ARTICLE + ARTICLE_CODE + " and description " + new_Coin + " couldn't be parsed successfully.")
+        return None
 
 ####orders
 
