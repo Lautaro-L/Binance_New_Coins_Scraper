@@ -58,7 +58,7 @@ def telegram_delete_message(message_id):
 class Send_Without_Spamming():
     
     def __init__(self):
-        self.id =0000
+        self.id = 0000
         self.first = True
     
     def send(self, message):
@@ -234,6 +234,7 @@ def schedule_Order(time_And_Pair, announcement):
 
 def place_Order_On_Time(time_till_live, pair, threads):
     delay = 0
+    sendmsg(f'Thread created to buy : {pair} at: {time_till_live}, now goin to sleep till its time to buy')
     global executed_queque
     try:
         if delay_mode:
