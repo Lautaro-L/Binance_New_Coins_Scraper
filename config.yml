@@ -7,7 +7,7 @@
     TEST: True
     SL: 1
     TP: 1
-    ENABLE_TSL: True
+    ENABLE_TSL: False
     TSL: 0.5
     TTP: 2
     CONSIDER_DELAY: False
