@@ -167,19 +167,18 @@ def get_Announcements():
 
 
 def get_Pair_and_DateTime(ARTICLE_CODE):
-    
-    new_Coin = requests.get(ARTICLE+ARTICLE_CODE).json()['data']['seoDesc']
-    # TODO: parse breaks when there are 2 dates in a string with time. 
+    pairs = []
     try:
+        new_Coin = requests.get(ARTICLE+ARTICLE_CODE).json()['data']['seoDesc']
         datetime = dparser.parse(new_Coin, fuzzy=True, ignoretz=True)
         raw_pairs = re.findall(regex, new_Coin)
-        pairs = []
         for pair in raw_pairs:
             if not pair.split('/')[0] in existing_coins:
                 pairs.append(pair.replace('/', ''))
         return [datetime, pairs]        
     except Exception as e:
         sendmsg("[!] The article with url " + ARTICLE + ARTICLE_CODE + " and description " + new_Coin + " couldn't be parsed successfully.")
+        sendmsg("Error log: {e}")
         return None
 
 ####orders
@@ -413,7 +412,9 @@ def main():
                     schedule_Order(time_And_Pair, announcement)
                     for pair in time_And_Pair[1]:
                         threading.Thread(target=place_Order_On_Time, args=(time_And_Pair[0], pair, threading.active_count() + 1)).start()
-                        sendmsg(f'Found new announcement preparing schedule for: {time_And_Pair[1]}')
+                        sendmsg(f'Found new announcement preparing schedule for: {pair}')
+                        existing_coins.append(re.sub( pairing, '', pair))
+                    save_json(coins_file, existing_coins)
         save_json(file, existing_Anouncements)
 
     threading.Thread(target=check_Schedules, args=()).start()
@@ -432,6 +433,8 @@ def main():
                         for pair in time_And_Pair[1]:
                             threading.Thread(target=place_Order_On_Time, args=(time_And_Pair[0], pair, threading.active_count() + 1)).start()
                             sendmsg(f'Found new announcement preparing schedule for {pair}')
+                            existing_coins.append(re.sub( pairing, '', pair))
+                        save_json(coins_file, existing_coins)
                 existing_Anouncements = load_json(file)
         
         threading.Thread(target=sendSpam, args=("sleep", f'Done checking announcements going to sleep for: {frequency} seconds&disable_notification=true')).start()
@@ -441,7 +444,7 @@ def main():
 
 #TODO:
 # posible integration with AWS lambda ping it time before the coin is listed so it can place a limit order a little bti more than opening price
-
+# parse breaks when there are 2 dates in a string with time. 
 
 if __name__ == '__main__':
     try:
@@ -453,20 +456,3 @@ if __name__ == '__main__':
     except Exception as exception:
         wrong = traceback.format_exc(limit=None, chain=True)
         sendmsg(wrong)
-
-
-
-
-
-
-
-
-
-#debuggin order
-#{
-#    "time": "2021-09-24 10:00:00",
-#    "pairs": [
-#        "DFUSDT",
-#        "SYSUSDT"
-#    ]
-#}
