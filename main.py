@@ -152,6 +152,7 @@ def get_Announcements():
 
     for article in unfiltered_Articles:
         flag = True
+        #add reschedule logic here too
         for word in key_words:
             if word in article['title']:
                 flag = False

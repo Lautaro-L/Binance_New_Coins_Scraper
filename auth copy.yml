@@ -2,7 +2,5 @@
   # CLIENT DETAILS
   binance_key: "api key here"
   binance_secret: "api secret here"
-  test: True
-
 
 #rename this file to auth.yml
