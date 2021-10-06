@@ -96,14 +96,16 @@ def sendSpam(pair, message):
 
 
 
-
-
-tp = cnf['TRADE_OPTIONS']['TP']
-sl = cnf['TRADE_OPTIONS']['SL']
-
 tsl_mode = cnf['TRADE_OPTIONS']['ENABLE_TSL']
-tsl = cnf['TRADE_OPTIONS']['TSL']
-ttp = cnf['TRADE_OPTIONS']['TTP']
+
+if tsl_mode:
+    sl = cnf['TRADE_OPTIONS']['TSL']
+    tp = cnf['TRADE_OPTIONS']['TTP']
+
+else:
+    tp = cnf['TRADE_OPTIONS']['TP']
+    sl = cnf['TRADE_OPTIONS']['SL']
+
 
 pairing = cnf['TRADE_OPTIONS']['PAIRING']
 ammount = cnf['TRADE_OPTIONS']['QUANTITY']
@@ -280,10 +282,10 @@ def place_Order_On_Time(time_till_live, pair, threads):
                     order = create_order(pair, ammount, 'BUY')
                     order['price'] = avFills(order)
                     break
-        order['tp'] = tp
-        order['sl'] = sl
         amount = order['executedQty']
         price = order['price']
+        order['tp'] = price + (price*tp /100)
+        order['sl'] = price + (price*sl /100)
         sendmsg(f'Bougth {amount} of {pair} at {price}')
         executed_queque.append(order)
     except Exception as exception:       
@@ -339,15 +341,12 @@ def sell():
                     last_price = get_price(symbol)
 
                     # update stop loss and take profit values if threshold is reached
-                    if float(last_price) > stored_price + (stored_price * float(coin_tp) /100) and tsl_mode:
+                    if float(last_price) > coin_tp and tsl_mode:
                         # increase as absolute value for TP
-                        new_tp = float(last_price) + (float(last_price)*ttp /100)
-                        # convert back into % difference from when the coin was bought
-                        new_tp = float( (new_tp - stored_price) / stored_price*100)
+                        new_tp = float(last_price) + (float(last_price)*tp /100)
 
                         # same deal as above, only applied to trailing SL
-                        new_sl = float(last_price) - (float(last_price)*tsl /100)
-                        new_sl = float((new_sl - stored_price) / stored_price*100)
+                        new_sl = float(last_price) - (float(last_price)*sl /100)
 
                         # new values to be added to the json file
                         coin['tp'] = new_tp
@@ -357,7 +356,7 @@ def sell():
 
                         threading.Thread(target=sendSpam, args=(symbol, f'Updated tp: {round(new_tp, 3)} and sl: {round(new_sl, 3)} for: {symbol}')).start()
                     # close trade if tsl is reached or trail option is not enabled
-                    elif float(last_price) < stored_price - (stored_price*sl /100) or float(last_price) > stored_price + (stored_price*tp /100) and not tsl_mode:
+                    elif float(last_price) < coin_sl or float(last_price) > coin_tp:
                         try:
 
                             # sell for real if test mode is set to false

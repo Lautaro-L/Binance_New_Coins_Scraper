@@ -8,8 +8,8 @@
     SL: 1
     TP: 1
     ENABLE_TSL: False
-    TSL: 0.5
-    TTP: 2
+    TSL: 1
+    TTP: 1
     CONSIDER_DELAY: False
     PERCENTAGE: 0.2
     #take in consideration the delay to place the order
