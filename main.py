@@ -28,6 +28,7 @@ coins_file = 'existing_coins.json'
 pair_Dict = {}
 existing_coins = []
 executed_queque = []
+current_buy_threads = []
 
 cnf = load_config('config.yml')
 client = load_binance_creds(r'auth.yml')
@@ -237,9 +238,15 @@ def schedule_Order(time_And_Pair, announcement):
 
 def place_Order_On_Time(time_till_live, pair, threads):
     delay = 0
-    sendmsg(f'Thread created to buy : {pair} at: {time_till_live}, now goin to sleep till its time to buy')
     global executed_queque
     try:
+        if pair in current_buy_threads:
+            sendmsg(f'{pair} already on a thread')
+            return
+        else:
+            current_buy_threads.append(pair)
+
+        sendmsg(f'Thread created to buy : {pair} at: {time_till_live}, now goin to sleep till its time to buy')
         if delay_mode:
             delay = (ping_binance() * percentage)
             time_till_live = (time_till_live - timedelta(seconds = delay))
@@ -249,7 +256,7 @@ def place_Order_On_Time(time_till_live, pair, threads):
         order = {}
 
         if test_mode:
-            price = get_price(pair)
+            price = float(get_price(pair))
             if price <= 0.00001:
                 price = get_price(pair)
             while True:
