@@ -7,8 +7,8 @@
     TEST: True
     SL: 1
     TP: 1
-    ENABLE_TSL: False
-    TSL: 1
+    ENABLE_TSL: True
+    TSL: 10
     TTP: 1
     CONSIDER_DELAY: False
     PERCENTAGE: 0.2

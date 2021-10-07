@@ -285,7 +285,7 @@ def place_Order_On_Time(time_till_live, pair, threads):
         amount = order['executedQty']
         price = order['price']
         order['tp'] = price + (price*tp /100)
-        order['sl'] = price + (price*sl /100)
+        order['sl'] = price - (price*sl /100)
         sendmsg(f'Bougth {amount} of {pair} at {price}')
         executed_queque.append(order)
     except Exception as exception:       
